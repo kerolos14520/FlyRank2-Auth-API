@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from supabase import create_client, Client
 
@@ -21,6 +22,9 @@ supabase: Client = create_client(url, key)
 # Initialize FastAPI app
 app = FastAPI(title="FlyRank Auth API")
 
+# Security Scheme for Swagger UI
+security = HTTPBearer()
+
 # Schemas
 class UserSignUp(BaseModel):
     email: EmailStr
@@ -29,6 +33,18 @@ class UserSignUp(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+# Helper Dependency: Authenticate Requests
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        # Retrieve user details from Supabase using the access token
+        user_response = supabase.auth.get_user(token)
+        if not user_response.user:
+            raise HTTPException(status_code=401, detail="Invalid token or expired session")
+        return user_response.user
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 # Routes
 @app.get("/")
@@ -42,7 +58,6 @@ def sign_up(user_data: UserSignUp):
             "email": user_data.email,
             "password": user_data.password,
         })
-        
         return {
             "message": "User created successfully",
             "user": response.user
@@ -53,12 +68,10 @@ def sign_up(user_data: UserSignUp):
 @app.post("/auth/login")
 def login(credentials: UserLogin):
     try:
-        # Authenticate user with Supabase
         response = supabase.auth.sign_in_with_password({
             "email": credentials.email,
             "password": credentials.password,
         })
-
         return {
             "message": "Login successful",
             "access_token": response.session.access_token,
@@ -67,3 +80,10 @@ def login(credentials: UserLogin):
         }
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+@app.get("/auth/me")
+def get_user_profile(current_user = Depends(get_current_user)):
+    return {
+        "message": "Protected route accessed successfully",
+        "user": current_user
+    }
