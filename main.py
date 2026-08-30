@@ -26,6 +26,10 @@ class UserSignUp(BaseModel):
     email: EmailStr
     password: str
 
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
 # Routes
 @app.get("/")
 def read_root():
@@ -45,3 +49,21 @@ def sign_up(user_data: UserSignUp):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/auth/login")
+def login(credentials: UserLogin):
+    try:
+        # Authenticate user with Supabase
+        response = supabase.auth.sign_in_with_password({
+            "email": credentials.email,
+            "password": credentials.password,
+        })
+
+        return {
+            "message": "Login successful",
+            "access_token": response.session.access_token,
+            "token_type": "bearer",
+            "user": response.user
+        }
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
