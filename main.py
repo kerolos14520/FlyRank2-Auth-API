@@ -38,7 +38,6 @@ class UserLogin(BaseModel):
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     try:
-        # Retrieve user details from Supabase using the access token
         user_response = supabase.auth.get_user(token)
         if not user_response.user:
             raise HTTPException(status_code=401, detail="Invalid token or expired session")
@@ -87,3 +86,12 @@ def get_user_profile(current_user = Depends(get_current_user)):
         "message": "Protected route accessed successfully",
         "user": current_user
     }
+
+@app.post("/auth/logout")
+def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        # Sign out user session using the current access token
+        supabase.auth.sign_out(credentials.credentials)
+        return {"message": "Logged out successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Logout failed: {str(e)}")
