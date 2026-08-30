@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, EmailStr
 from supabase import create_client, Client
 
 # Load .env file explicitly from current directory
@@ -18,8 +19,29 @@ if not url or not key:
 supabase: Client = create_client(url, key)
 
 # Initialize FastAPI app
-app = FastAPI()
+app = FastAPI(title="FlyRank Auth API")
 
+# Schemas
+class UserSignUp(BaseModel):
+    email: EmailStr
+    password: str
+
+# Routes
 @app.get("/")
 def read_root():
     return {"message": "Server and Supabase client configured successfully!"}
+
+@app.post("/auth/signup")
+def sign_up(user_data: UserSignUp):
+    try:
+        response = supabase.auth.sign_up({
+            "email": user_data.email,
+            "password": user_data.password,
+        })
+        
+        return {
+            "message": "User created successfully",
+            "user": response.user
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
